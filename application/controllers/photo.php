@@ -1,0 +1,246 @@
+<?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+
+class Photo extends CI_Controller {
+
+	function __construct()
+	{
+		parent::__construct();
+		$this->load->model('photo_model', 'pm');
+	}
+	
+	public function index()
+	{
+		$users = $this->pm->get_all_users();
+		
+		$d = array("users"=>$users);
+		$this->load->view("photo/index", $d);
+	}
+	
+	public function preview($id)
+	{
+		$d = array("id"=>$id);
+		$this->load->view('photo/preview', $d);
+	}
+	
+	public function muatnaik($id)
+	{
+		$us = $this->pm->get_user_by_id($id)->row();
+		$d = array("nom_id"=>$us->R_NO_MATRIK_TMP);
+		$this->load->view('photo/muatnaik', $d);
+	}
+	
+	public function uploader($id)
+	{
+		$us = $this->pm->get_user_by_id($id)->row();
+		$d = array("nom_id"=>$us->t01_nom_id);
+		$this->load->view('photo/uploader', $d);
+	}
+	
+	public function savegambar()
+	{
+		define('UPLOAD_DIR', 'uploads/thumb/');
+		$img = $_POST['image-data'];
+		$singkatan = $_POST['singkatan'];
+		$nom_id = $_POST['nom_id'];
+		$img = str_replace('data:image/png;base64,', '', $img);
+		$img = str_replace(' ', '+', $img);
+		$data = base64_decode($img);
+		$file = UPLOAD_DIR . $nom_id . '.png';
+		$success = file_put_contents($file, $data);
+		
+		$d = array(
+			"NO_MATRIK"=>$nom_id,
+			"SINGKATAN"=>$singkatan,
+			"GAMBAR"=>$file
+		);
+		
+		$this->pm->add_foto($d, $nom_id);
+		//print $success ? $file : 'Unable to save the file.';
+		echo "<img width='350px' src='".base_url()."index.php/photo/mukadepan/".$nom_id."'>";
+		
+		
+		
+	}
+	
+	public function mukadepan($id)
+	{
+		//Set the content type
+		header('content-type: image/jpeg');
+		
+		$this->load->library('idcard');
+		$us = $this->pm->get_user_by_id($id)->row();
+		$p = array(
+			"NAMA" 		=>	$us->R_NAMA, 
+			"MATRIK"	=>	$us->R_NO_MATRIK_TMP, 
+			"PROGRAM"	=>  $us->PRG_NAMA_PROGRAM_BM,  
+			"SINGKATAN"	=>	$us->SINGKATAN,
+			"GAMBAR"		=>	$us->GAMBAR
+		);
+			
+		$this->idcard->kad_matrik($p);
+
+	}
+	
+	public function belakang($id)
+	{
+		include(APPPATH.'libraries/phpqrcode/qrlib.php'); 
+		
+		header('content-type: image/jpeg');
+		
+		$this->load->library('barcode');
+		$this->load->library('idcard');
+		
+		$us = $this->pm->get_user_by_id($id)->row();
+		$p = array(
+			"NAMA" 		=>	$us->R_NAMA, 
+			"MATRIK"	=>	$us->R_NO_MATRIK_TMP, 
+			"PROGRAM"	=>  $us->PRG_NAMA_PROGRAM_BM,
+			"SINGKATAN"	=>	$us->SINGKATAN
+		);
+		
+		// how to save PNG codes to server 
+		 
+		$tempDir = 'src/qr/'; 
+		 
+		$codeContents = 'mynemo.umt.edu.my/checker/profile/'.$us->R_NO_MATRIK_TMP; 
+		 
+		// we need to generate filename somehow,  
+		// with md5 or with database ID used to obtains $codeContents... 
+		$fileName = '005_file_'.md5(time()).'.png'; 
+		 
+		$pngAbsoluteFilePath = $tempDir.$fileName; 
+		 
+		// generating 
+		if (!file_exists($pngAbsoluteFilePath)) { 
+			QRcode::png($codeContents, $pngAbsoluteFilePath); 
+		} 
+		 
+		$this->idcard->belakang($p, $pngAbsoluteFilePath);
+		unlink($pngAbsoluteFilePath);
+		
+	}
+
+	public function cetak1($id)
+	{
+		$this->load->library('idcard');
+		$us = $this->pm->get_user_by_id($id)->row();
+		$p = array(
+			"NAMA" 		=>	$us->t01_nama, 
+			"MATRIK"	=>	$us->t01_nom_id, 
+			"PROGRAM"	=>  $us->t01_program,  
+			"SINGKATAN"	=>	$us->t01_singkatan
+		);
+			
+		$this->idcard->kad_matrik("src/bamlom.jpg", $p, true);
+
+	}	
+	public function cetak($id)
+	{
+		$this->pm->update_foto(array("CETAK"=>"1"), $id);
+		
+		$this->load->library('idcard');
+		include(APPPATH.'libraries/phpqrcode/qrlib.php'); 
+		$this->load->library('barcode');
+		
+		require_once(APPPATH .'third_party/tcpdf/tcpdf.php');
+		// require_once(APPPATH .'third_party/tcpdf/pdf_js.php');
+		require_once(APPPATH .'third_party/tcpdf/pdf_autoprint.php');
+		
+		$us = $this->pm->get_user_by_id($id)->row();
+		$p = array(
+			"NAMA" 		=>	$us->R_NAMA, 
+			"MATRIK"	=>	$us->R_NO_MATRIK_TMP, 
+			"PROGRAM"	=>  $us->PRG_NAMA_PROGRAM_BM,  
+			"SINGKATAN"	=>	$us->SINGKATAN,
+			"GAMBAR"		=>	$us->GAMBAR
+		);
+			
+		$this->idcard->kad_matrik($p, true);
+		
+		$tempDir = 'src/qr/'; 
+		 
+		$codeContents = 'mynemo.umt.edu.my/checker/profile/'.$us->R_NO_MATRIK_TMP; 
+		 
+		// we need to generate filename somehow,  
+		// with md5 or with database ID used to obtains $codeContents... 
+		$fileName = '005_file_'.md5(time()).'.png'; 
+		 
+		$pngAbsoluteFilePath = $tempDir.$fileName; 
+		 
+		// generating 
+		if (!file_exists($pngAbsoluteFilePath)) { 
+			QRcode::png($codeContents, $pngAbsoluteFilePath); 
+		} 
+		 
+		$this->idcard->belakang($p, $pngAbsoluteFilePath, true);		
+		unlink($pngAbsoluteFilePath);
+		
+		
+		//confir
+		$muka_depan = "kad/".$id.".jpg";
+		$muka_blkg = "kad/".$id."_back.jpg";
+		
+		
+		$pdf = new PDF_AutoPrint('L', PDF_UNIT, array(59,98), true, 'UTF-8', false);
+
+		$pdf->SetHeaderMargin(0);
+		$pdf->SetFooterMargin(0);
+
+		// remove default footer
+		$pdf->setPrintFooter(false);
+
+		// set auto page breaks
+		$pdf->SetAutoPageBreak(FALSE);
+
+		// set image scale factor
+		$pdf->setImageScale(PDF_IMAGE_SCALE_RATIO);
+
+		
+		// ---------------------------------------------------------
+
+		// set font
+		$pdf->SetFont('times', '', 48);
+
+
+		// add a page
+		$pdf->AddPage();
+		$pdf->Image($muka_depan, 0, 0, 98, 59, '', '', '', false, 300, '', false, false, 0);
+		// Print a text
+		
+
+		// --- example with background set on page ---
+
+		// remove default header
+		$pdf->setPrintHeader(false);
+
+		// add a page
+		$pdf->AddPage();
+
+
+		// -- set new background ---
+
+		// get the current page break margin
+		$bMargin = $pdf->getBreakMargin();
+		// get current auto-page-break mode
+		$auto_page_break = $pdf->getAutoPageBreak();
+		// disable auto-page-break
+		$pdf->SetAutoPageBreak(false, 0);
+		// set bacground image
+
+		$pdf->Image($muka_blkg, 0, 0, 98, 59, '', '', '', false, 300, '', false, false, 0);
+		// restore auto-page-break status
+		$pdf->SetAutoPageBreak($auto_page_break, $bMargin);
+		// set the starting point for the page content
+		$pdf->setPageMark();
+
+
+		
+		//Close and output PDF document
+		$pdf->AutoPrint(false);
+		$pdf->Output('matrik_'.$id.'.pdf', 'I');
+		unlink($muka_depan);
+		unlink($muka_blkg);
+		
+		
+	}
+}
